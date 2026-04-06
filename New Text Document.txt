@@ -1,0 +1,84 @@
+FROM php:7.3-apache
+
+RUN apt-get update && apt-get install -y \
+    libpng-dev \
+    libjpeg-dev \
+    libxml2-dev \
+    libicu-dev \
+    libzip-dev \
+    git \
+    && docker-php-ext-configure gd --with-jpeg-dir=/usr/include/ \
+    && docker-php-ext-install -j$(nproc) mysqli pdo_mysql gd intl xmlrpc soap zip opcache \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rm -rf /var/www/html/* \
+    && git clone -b v3.11.2 https://github.com/moodle/moodle.git /var/www/html \
+    && chown -R www-data:www-data /var/www/html
+
+RUN mkdir -p /var/www/moodledata \
+    && chown -R www-data:www-data /var/www/moodledata \
+    && chmod 777 /var/www/moodledata
+
+CMD ["apache2-foreground"]
+
+
+
+------------------------
+
+version: '3'
+
+services:
+  mariadb:
+    image: mariadb:10.5
+    environment:
+      - MYSQL_ROOT_PASSWORD=bitnami
+      - MYSQL_DATABASE=moodle
+      - MYSQL_USER=moodleuser
+      - MYSQL_PASSWORD=bitnami
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      pentest_net:
+        ipv4_address: 172.19.0.6
+
+  moodle:
+    build: .
+    ports:
+      - "9099:80"
+    volumes:
+      - moodledata_data:/var/www/moodledata
+    depends_on:
+      - mariadb
+    networks:
+      pentest_net:
+        ipv4_address: 172.19.0.5
+
+  fileserver:
+    image: dperson/samba
+    environment:
+      - USER=admin;adminpass
+    command: -u "admin;adminpass" -s "TaiLieuMat;/share;yes;no;yes;all;all;all"
+    volumes:
+      - ./secret_data:/share
+    networks:
+      pentest_net:
+        ipv4_address: 172.19.0.10
+
+  admin-jumpbox:
+    image: rastasheep/ubuntu-sshd
+    networks:
+      pentest_net:
+        ipv4_address: 172.19.0.20
+
+volumes:
+  mariadb_data:
+  moodledata_data:
+
+networks:
+  pentest_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16
