@@ -37,23 +37,19 @@ services:
       - MYSQL_PASSWORD=bitnami
     volumes:
       - mariadb_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
     networks:
-      pentest_net:
-        ipv4_address: 172.19.0.6
+      dmz_macvlan:
+        ipv4_address: 192.168.10.6
 
   moodle:
     build: .
-    ports:
-      - "9099:80"
     volumes:
       - moodledata_data:/var/www/moodledata
     depends_on:
       - mariadb
     networks:
-      pentest_net:
-        ipv4_address: 172.19.0.5
+      dmz_macvlan:
+        ipv4_address: 192.168.10.5  # IP của Web Server
 
   fileserver:
     image: dperson/samba
@@ -63,22 +59,25 @@ services:
     volumes:
       - ./secret_data:/share
     networks:
-      pentest_net:
-        ipv4_address: 172.19.0.10
+      dmz_macvlan:
+        ipv4_address: 192.168.10.10
 
   admin-jumpbox:
     image: rastasheep/ubuntu-sshd
     networks:
-      pentest_net:
-        ipv4_address: 172.19.0.20
+      dmz_macvlan:
+        ipv4_address: 192.168.10.20
 
 volumes:
   mariadb_data:
   moodledata_data:
 
 networks:
-  pentest_net:
-    driver: bridge
+  dmz_macvlan:
+    driver: macvlan
+    driver_opts:
+      parent: enp0s3
     ipam:
       config:
-        - subnet: 172.19.0.0/16
+        - subnet: 192.168.10.0/24
+          gateway: 192.168.10.1   # IP của pfSense
